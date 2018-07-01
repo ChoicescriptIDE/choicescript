@@ -87,6 +87,8 @@ if (typeof console != "undefined") {
   console.log = function(msg) {
     oldLog(msg);
     countWords(msg);
+    if (typeof process.send != "undefined")
+      process.send({type:"log", value: msg});
   };
 }
 

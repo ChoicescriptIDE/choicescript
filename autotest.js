@@ -39,6 +39,11 @@ if (typeof java == "undefined") {
   load("web/mygame/mygame.js");
   load("editor/embeddable-autotester.js");
   print = function print(str) {
+    if (typeof process.send != "undefined")
+      if (typeof str == "object") // error object
+        process.send({type:"log", value: str.message});
+      else
+        process.send({type:"log", value: str});
     console.log(str);
   };
 } else {
