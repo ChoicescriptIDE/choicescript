@@ -21,15 +21,15 @@ if (typeof process != "undefined") {
   load = function(file) {
     vm.runInThisContext(fs.readFileSync(file), file);
   };
-  load(rootDir+ "scene.js");
-  load(rootDir+"navigator.js");
-  load(rootDir+"util.js");
+  load("web/scene.js");
+  load("web/navigator.js");
+  load("web/util.js");
   load("headless.js");
-  load(rootDir+"mygame/mygame.js");
+  load("web/mygame/mygame.js");
   fs.writeFileSync(outputFile, compile(), "utf8");
 }
 
-if (!rootDir) rootDir = "web/";
+if (!rootDir) throw new Error("Specify a project to compile");
 
 function compile(){
 
@@ -42,7 +42,7 @@ function compile(){
   }
 
   //1. Grab the game's html file
-  var url = rootDir+"mygame/index.html";
+  var url = "web/mygame/index.html";
   var game_html = slurpFile(url, true);
     
   //2. Find and extract all .js file data
@@ -53,7 +53,7 @@ function compile(){
   console.log("\nExtracting js data from:");
   while (doesMatch = patt.exec(game_html)) {
     console.log(doesMatch[1]);
-    next_file = safeSlurpFile(rootDir+'mygame/' + doesMatch[1]);
+    next_file = safeSlurpFile('web/mygame/' + doesMatch[1]);
     if (next_file != "undefined" && next_file !== null) {
       jsStore = jsStore + next_file;
     }
@@ -68,7 +68,7 @@ function compile(){
   while (doesMatch = patt.exec(game_html)) {
     // console.log(doesMatch[0]);
     console.log(doesMatch[1]);
-    next_file = slurpFile(rootDir+'mygame/' + doesMatch[1], true);
+    next_file = slurpFile('web/mygame/' + doesMatch[1], true);
     if (next_file != "undefined" && next_file !== null) {
       cssStore = cssStore + next_file;
     }
@@ -98,7 +98,7 @@ function compile(){
   //Check startup.txt for a *scene_list
   var sceneList = false;
   scene = new Scene("startup");
-  var scene_data = slurpFile(rootDir+'mygame/scenes/startup.txt', true);
+  var scene_data = slurpFile(rootDir+'startup.txt', true);
   scene.loadLines(scene_data);
   patt = /^\*scene_list\b/i;
   for (i = 0; i < scene["lines"].length; i++) {
@@ -146,7 +146,7 @@ function compile(){
   console.log("Combining scene files...");
   var scene_data = "";
   for (var i = 0; i < knownScenes.length; i++) {
-      scene_data = safeSlurpFile(rootDir+'mygame/scenes/' + knownScenes[i]);
+      scene_data = safeSlurpFile(rootDir+knownScenes[i]);
       if (scene_data === null) {
         if ("choicescript_upgrade.txt" === knownScenes[i]) continue;
         throw new Error("Couldn't find file " + 'mygame/scenes/' + knownScenes[i]);
