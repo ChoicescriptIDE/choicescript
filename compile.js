@@ -21,6 +21,7 @@ if (typeof process != "undefined") {
   load = function(file) {
     vm.runInThisContext(fs.readFileSync(file), file);
   };
+  load("cside_message.js");
   load(rootDir+ "scene.js");
   load(rootDir+"navigator.js");
   load(rootDir+"util.js");
