@@ -416,7 +416,7 @@ function autotester(sceneText, nav, sceneName, extraLabels) {
   }
 
   Scene.operators["/"] = function divide(v1,v2,line,sceneObj) {
-    let name = null;
+    var name = null;
     if (sceneObj) {
       name = sceneObj.name;
     }
