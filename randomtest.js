@@ -168,7 +168,7 @@ if (typeof importScripts != "undefined") {
   nav.setStartingStatsClone(stats);
   delay = true;
   onmessage = function(event) {
-    if (projectPath == "") projectPath = event.data.projectPath;
+    if (!projectPath) projectPath = event.data.projectPath;
     iterations = event.data.iterations;
     randomSeed = event.data.randomSeed;
     showCoverage = event.data.showCoverage;
@@ -808,7 +808,6 @@ function randomtestAsync(i, showCoverage) {
 }
 
 function randomtest() {
-  console.log("Writing to file: " + outFilePath,  { type: "config", outputFile: outFilePath });
   configureShowText();
   var start = new Date().getTime();
   randomSeed *= 1;
