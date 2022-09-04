@@ -142,6 +142,7 @@ Scene.prototype.dedent = function dedent(newDent) {};
 
 Scene.prototype.printLine = function printLine(line) {
     if (!line) return null;
+    this.screenEmpty = false;
     line = this.replaceVariables(line.replace(/^\s*/, ""));
     this.accumulatedParagraph.push(line);
     // insert extra space unless the line ends with hyphen or dash
@@ -1372,11 +1373,15 @@ Scene.prototype.buyButton = function(product, priceGuess, label, title) {
   this.finished = true;
   this.skipFooter = true;
   var self = this;
+  var purchaseFinished = function() {
+    if (label) self["goto"](label);
+    self.finished = false;
+    self.skipFooter = false;
+    self.resetPage();
+  }
   getPrice(product, function (price) {
     if (!price || "free" == price) {
-      if (label) self["goto"](label);
-      self.finished = false;
-      self.resetPage();
+      purchaseFinished();
     } else {
       if (price == "guess") price = priceGuess + " USD";
       var prerelease = self.getVar('choice_prerelease');
@@ -1396,11 +1401,7 @@ Scene.prototype.buyButton = function(product, priceGuess, label, title) {
         function() {
           safeCall(self, function() {
               purchase(product, function() {
-                safeCall(self, function() {
-                  self["goto"](label);
-                  self.finished = false;
-                  self.resetPage();
-                });
+                safeCall(self, purchaseFinished);
               });
           });
         }
@@ -1414,9 +1415,7 @@ Scene.prototype.buyButton = function(product, priceGuess, label, title) {
             safeCall(self, function() {
                 restorePurchases(product, function(purchased) {
                   if (purchased) {
-                    if (label) self["goto"](label);
-                    self.finished = false;
-                    self.resetPage();
+                    purchaseFinished();
                   } else {
                     // refresh, in case we're on web showing a full-screen login. Not necessary on mobile? But, meh.
                     clearScreen(function() {loadAndRestoreGame("", window.forcedScene);});
@@ -1502,28 +1501,41 @@ Scene.prototype.abort = function() {
 // create a new permanent stat
 Scene.prototype.create = function create(line) {
     var result = /^(\w*)(.*)/.exec(line);
-    if (!result) throw new Error(this.lineMsg()+"Invalid create instruction, no variable specified: " + line);
+    if (!result) throw new Error(this.lineMsg() + "Invalid create instruction, no variable specified: " + line);
     var variable = result[1];
     this.validateVariable(variable);
     variable = variable.toLowerCase();
     var expr = result[2];
     var stack = this.tokenizeExpr(expr);
-    if (stack.length === 0) throw new Error(this.lineMsg()+"Invalid create instruction, no value specified: " + line);
-    var self = this;
-    function complexError() {
-      throw new Error(self.lineMsg()+"Invalid create instruction, value must be a a number, true/false, or a quoted string: " + line);
-    }
-    if (stack.length > 1) complexError();
-    var token = stack[0];
-    if (!/STRING|NUMBER|VAR/.test(token.name)) complexError();
-    if ("VAR" == token.name && !/^true|false$/i.test(token.value)) complexError();
-    if ("STRING" == token.name && /(\$|@)!?!?{/.test(token.value)) throw new Error(this.lineMsg() + "Invalid create instruction, value must be a simple string without ${} or @{}: " + line);
-    var value = this.evaluateExpr(stack);
-    if (!this.created) this.created = {};
-    if (this.created[variable]) throw new Error(this.lineMsg() + "Invalid create. " + variable + " was previously created on line " + this.created[variable]);
-    this.created[variable] = this.lineNum + 1;
-    this.stats[variable] = value;
-    if (this.nav) this.nav.startingStats[variable] = value;
+    if (stack.length > 1) throw new Error(this.lineMsg() + "Invalid create instruction, too many values: " + line);
+    this.createVariable(variable, stack[0], line);
+}
+
+Scene.prototype.createVariable = function createVariable(variable, token, line) {
+  var self = this;
+  if (!token) throw new Error(this.lineMsg() + "Invalid create instruction, no value specified: " + line);
+  function complexError() {
+    throw new Error(self.lineMsg() + "Invalid create instruction, value must be a number, true/false, or a quoted string: " + line);
+  }
+  if (!/STRING|NUMBER|VAR/.test(token.name)) complexError();
+  if ("VAR" == token.name && !/^true|false$/i.test(token.value)) complexError();
+  if ("STRING" == token.name && /(\$|@)!?!?{/.test(token.value)) throw new Error(this.lineMsg() + "Invalid create instruction, value must be a simple string without ${} or @{}: " + line);
+  var value = this.evaluateExpr([token]);
+  if (!this.created) this.created = {};
+  if (this.created[variable]) throw new Error(this.lineMsg() + "Invalid create. " + variable + " was previously created on line " + this.created[variable]);
+  this.created[variable] = this.lineNum + 1;
+  this.stats[variable] = value;
+  if (this.nav) this.nav.startingStats[variable] = value;
+}
+
+// *create_array {name} {length} {value(s)}
+// create an "array" of permanent stats:
+//    myarray_1
+//    myarray_2
+//    ...
+//    myarray_count
+Scene.prototype.create_array = function create(line) {
+  this.defineArray("create", line);
 };
 
 // *temp
@@ -1545,6 +1557,69 @@ Scene.prototype.temp = function temp(line) {
     }
     this.temps[variable.toLowerCase()] = value;
 };
+
+// *temp_array
+// create an "array" of temporary stats for the current scene
+Scene.prototype.temp_array = function temp_array(line) {
+  this.defineArray("temp", line);
+};
+
+Scene.prototype.defineArray = function defineArray(command, line) {
+  var result = /^(\w+)(.*)/.exec(line);
+  if (!result) throw new Error(this.lineMsg() + "Invalid " + command + "_array instruction, no array name specified: " + line);
+  var variable = result[1];
+  this.validateVariable(variable);
+  variable = variable.toLowerCase();
+  var stack = this.tokenizeExpr(result[2].trim());
+  if (!stack.length) {
+    throw new Error(this.lineMsg() + "Invalid " + command + "_array instruction, missing length: " + line);
+  }
+  var length = Number(stack.shift().value);
+  if (length !== Math.floor(length) || length < 1) {
+    throw new Error(this.lineMsg() + "Invalid " + command + "_array instruction, length should be a whole number greater than 0: " + line);
+  }
+
+  var token;
+  var value = null;
+  var self = this;
+  var i;
+  function create(suffix) {
+    if (command === "create") {
+      self.createVariable(variable + "_" + suffix, token, line);
+    } else {
+      self.temps[variable + "_" + suffix] = value;
+    }
+  }
+
+  function next() {
+    token = stack[0];
+    if (!token) throw new Error(self.lineMsg() + "Too few values. Expected 1 default value or " + length + " explicit values, not " + i + ": " + line);
+    value = self.evaluateValueToken(stack.shift(), stack);
+  }
+
+  if (stack.length) next();
+  
+  if (!stack.length) {
+    // Use first default value for all creations
+    for (i = 0; i < length; i++) {
+      create(i+1);
+    }
+  } else {
+    create(1);
+    for (i = 1; i < length; i++) {
+      next();
+      create(i+1);
+    }
+  }
+
+  if (stack.length) {
+    throw new Error(this.lineMsg() + "Too many values. Expected 1 default value or " + length + " explicit values: " + line);
+  }
+
+  token = { name: "NUMBER", value: length };
+  value = length;
+  create("count");
+}
 
 // retrieve the value of the variable, preferring temp scope
 Scene.prototype.getVar = function getVar(variable) {
@@ -1575,6 +1650,8 @@ Scene.prototype.getVar = function getVar(variable) {
     if (variable == "choice_kindle") return typeof isKindle !== "undefined" && !!isKindle;
     if (variable == "choice_randomtest") return !!this.randomtest;
     if (variable == "choice_quicktest") return false; // quicktest will explore "false" paths
+    if (variable == "choice_linenum") return this.lineNum;
+    if (variable == "choice_scene") return this.name;
     if (variable == "choice_restore_purchases_allowed") return isRestorePurchasesSupported();
     if (variable == "choice_save_allowed") return areSaveSlotsSupported();
     if (variable == "choice_time_stamp") return Math.floor(new Date()/1000);
@@ -1636,6 +1713,26 @@ Scene.prototype["delete"] = function scene_delete(variable) {
     } else {
         delete this.temps[variable];
     }
+};
+
+Scene.prototype["delete_array"] = function scene_delete_array(arrayName) {
+  arrayName = arrayName.toLowerCase();
+  if ("undefined" === typeof this.temps[arrayName + "_count"]) {
+      if ("undefined" === typeof this.stats[arrayName + "_count"]) {
+          throw new Error(this.lineMsg() + "Non-existent array '"+arrayName+"'");
+      }
+      var length = this.stats[arrayName + "_count"];
+      delete this.stats[arrayName + "_count"];
+      for (var i = 1; i <= length; i++) {
+        delete this.stats[arrayName + ("_" + i)];
+      }
+  } else {
+      var length = this.temps[arrayName + "_count"];
+      delete this.temps[arrayName + "_count"];
+      for (var i = 1; i <= length; i++) {
+        delete this.temps[arrayName + ("_" + i)];
+      }
+  }
 };
 
 // during a choice, recursively parse the options
@@ -2161,13 +2258,14 @@ Scene.prototype.advertisement = function advertisement(durationInSeconds) {
       self.finished = false;
       self.skipFooter = false;
       self.execute();
+      return;
     }
     self.printLine("Come back later to play the next part of [i]${choice_title}[/i]!");
     self.paragraph();
     self.printLine("Or you can buy the game now to skip the wait.");
     self.paragraph();
     self.buyButton("adfree", "$1.99", null, "It");
-    self.delay_break(durationInSeconds || 7200);
+    self.delay_break(durationInSeconds || 300);
   });
 };
 
@@ -4634,10 +4732,10 @@ Scene.operators = {
     "modulo": function modulo(v1,v2,line,sceneObj) { var name = null; if (sceneObj) name = sceneObj.name; return num(v1,line,name) % num(v2,line,name); },
 };
 
-Scene.initialCommands = {"create":1,"scene_list":1,"title":1,"author":1,"comment":1,"achievement":1,"product":1,"ifid":1};
+Scene.initialCommands = {"create":1,"create_array":1,"scene_list":1,"title":1,"author":1,"comment":1,"achievement":1,"product":1,"ifid":1};
 
 Scene.validCommands = {"comment":1, "goto":1, "gotoref":1, "label":1, "looplimit":1, "finish":1, "abort":1,
-    "choice":1, "create":1, "temp":1, "delete":1, "set":1, "setref":1, "print":1, "if":1, "rand":1,
+    "choice":1, "create":1, "create_array": 1, "temp":1, "temp_array": 1, "delete":1, "delete_array":1, "set":1, "setref":1, "print":1, "if":1, "rand":1,
     "page_break":1, "line_break":1, "script":1, "else":1, "elseif":1, "elsif":1, "reset":1,
     "goto_scene":1, "fake_choice":1, "input_text":1, "ending":1, "share_this_game":1, "stat_chart":1,
     "subscribe":1, "show_password":1, "gosub":1, "return":1, "hide_reuse":1, "disable_reuse":1, "allow_reuse":1,
