@@ -4748,3 +4748,5 @@ Scene.validCommands = {"comment":1, "goto":1, "gotoref":1, "label":1, "looplimit
     "timer":1,"youtube":1,"product":1,"text_image":1,"ai":1,"params":1,"config":1,"ifid":1,
     "page_break_advertisement":1, "finish_advertisement":1
     };
+
+module.exports = { Scene };

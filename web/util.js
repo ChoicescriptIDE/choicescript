@@ -1293,3 +1293,10 @@ function remoteConfig(variable, callback) {
     return safeTimeout(function() {callback(result);}, 0);
   }
 }
+
+module.exports = {
+  trim,
+  num,
+  bool,
+  matchBracket
+}
