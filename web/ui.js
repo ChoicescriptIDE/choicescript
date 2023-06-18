@@ -172,7 +172,7 @@ function showMenu() {
       {name:"Email us at " + getSupportEmail() + ".", group:"choice", contactUs:true},
       {name:"Share this game with friends.", group:"choice", share:true},
       {name:"Email me when new games are available.", group:"choice", subscribe:true},*/
-      {name:"Show keyboard shortcuts.", group:"choice", shortcuts:true},
+      {name:"Show keyboard shortcuts.", group:"choice", shortcuts:true}
     );
     if (document.getElementById("aboutLink")) {
       options.push({name:"View the credits.", group:"choice", credits:true});
