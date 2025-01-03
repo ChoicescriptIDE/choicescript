@@ -176,7 +176,7 @@ function showMenu() {
     );
     options.push(
       {name:"Restart the game.", group:"choice", restart:true},
-      {name:"Change settings.", group:"choice", settings:true},
+      {name:"Change settings.", group:"choice", settings:true}
       /*{name:"Play more games like this.", group:"choice", moreGames:true},
       {name:"Email us at " + getSupportEmail() + ".", group:"choice", contactUs:true},
       {name:"Share this game with friends.", group:"choice", share:true},
@@ -187,13 +187,13 @@ function showMenu() {
       options.push(
         { name: "Email us at " + getSupportEmail() + ".", group: "choice", contactUs: true },
         { name: "Report a bug.", group: "choice", reportBug: true },
-        { name: "Share this game with friends.", group: "choice", share: true },
-      )
+        { name: "Share this game with friends.", group: "choice", share: true }
+      );
     }
-    options.push(
-      /*{name:"Email me when new games are available.", group:"choice", subscribe:true},
-      {name:"Show keyboard shortcuts.", group:"choice", shortcuts:true}*/
-    );
+    /*options.push(
+      {name:"Email me when new games are available.", group:"choice", subscribe:true},
+      {name:"Show keyboard shortcuts.", group:"choice", shortcuts:true}
+    )*/
     if (document.getElementById("aboutLink")) {
       options.push({name:"View the credits.", group:"choice", credits:true});
     }
