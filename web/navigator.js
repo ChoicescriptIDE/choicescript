@@ -108,3 +108,5 @@ SceneNavigator.prototype.loadProducts = function(productArray, purchaseMap) {
     this.products[product] = {};
   }
 }
+
+module.exports = { SceneNavigator };
